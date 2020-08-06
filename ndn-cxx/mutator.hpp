@@ -879,6 +879,7 @@ if(mutationType < TLVchange){
 
 }
 
+
 size_t deleteNameCom(Block wire, unsigned int Seed, uint8_t* Dat, size_t Size, size_t MaxSize){
   wire.parse();
   if(wire.elements_size() <= 1) return wire.value_size();
@@ -909,6 +910,42 @@ size_t deleteNameCom(Block wire, unsigned int Seed, uint8_t* Dat, size_t Size, s
 
   free(bytes);
   return len;
+}
+size_t addPrefixCom(Block wire, unsigned int Seed, uint8_t* Dat, size_t Size, size_t MaxSize){
+   if((MaxSize-8) <= (Size))return wire.value_size();
+
+   size_t totalLength = 0;
+   EncodingEstimator estimator;
+   Name name;
+   wire.parse();
+   size_t estimatedSize = name.wireEncode(estimator);
+   uint32_t additions = (rand()%((MaxSize-Size)/3));
+   additions = 1;
+   EncodingBuffer encoder(estimatedSize, 0);
+   uint8_t* bytes = ( uint8_t*) malloc(sizeof(uint8_t)*MaxSize);
+   bytes[0] = 255;
+   size_t len = 1;
+   uint32_t mutations = (rand()%255);
+   bytes[0] = mutations; //TODO remove after fuzzer assetion fix
+//   for(uint32_t i = 0; i < mutations; i++){
+//      len =  LLVMFuzzerMutate(bytes, len, MaxSize-8);
+//   }
+   size_t i;
+   for(i=0;i<wire.elements_size();i++){
+      totalLength += encoder.appendByteArrayBlock(wire.elements()[i].type(), wire.elements()[i].value(), wire.elements()[i].value_size());
+   }
+   for(i=0;i<additions;i++){
+      totalLength += encoder.appendByteArrayBlock(tlv::GenericNameComponent, bytes, len);
+    }
+    totalLength += encoder.prependVarNumber(totalLength);
+    totalLength += encoder.prependVarNumber(tlv::Name);
+    encoder.block().parse();
+    const uint8_t* byteTransfer = encoder.block().wire();
+    for(i = 0; i < totalLength; i++){
+        Dat[i]= byteTransfer[i];
+    }
+    free(bytes);
+    return totalLength;
 }
 
 size_t addNameCom(Block wire, unsigned int Seed, uint8_t* Dat, size_t Size, size_t MaxSize){
@@ -942,7 +979,6 @@ size_t addNameCom(Block wire, unsigned int Seed, uint8_t* Dat, size_t Size, size
   for(i = 0; i < len; i++){
      Dat[i]= byteTransfer[i];
      }
-
   free(bytes);
   return len;
 }
